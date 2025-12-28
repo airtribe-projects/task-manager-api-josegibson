@@ -10,8 +10,8 @@ const data_parsed = JSON.parse(fs.readFileSync('./task.json', 'utf-8'));
 let id = data_parsed.tasks.length + 1;
 
 const validateTask = (req, res, next) => {
-    const task = req.body;
-    if (!task.title || !task.description || !task.completed) {
+    const { title, description, completed, priority } = req.body;
+    if (title === undefined || description === undefined || completed === undefined || typeof completed !== 'boolean') {
         return res.status(400).send('Invalid task input');
     }
     next();
@@ -27,12 +27,21 @@ const validateTaskId = (req, res, next) => {
 
 app.get('/tasks', (req, res) => {
     const queries = req.query;
+    let tasks = [...data_parsed.tasks];
+
     if (queries.completed) {
         const completed = queries.completed === 'true';
-        const tasks = data_parsed.tasks.filter((task) => task.completed === completed);
-        return res.send(tasks);
+        tasks = tasks.filter((task) => task.completed === completed);
     }
-    res.send(data_parsed.tasks);
+
+    tasks.sort((a, b) => {
+        if (a.created_on && b.created_on) {
+            return new Date(a.created_on) - new Date(b.created_on);
+        }
+        return 0;
+    });
+
+    res.send(tasks);
 })
 
 app.get('/tasks/:id', validateTaskId, (req, res) => {
@@ -47,10 +56,13 @@ app.post('/tasks', validateTask, (req, res) => {
         id: id++,
         title: task.title,
         description: task.description,
-        completed: task.completed
+        completed: task.completed,
+        priority: task.priority,
+        created_on: new Date(),
+        updated_on: new Date()
     });
     // fs.writeFileSync('./task.json', JSON.stringify(data_parsed));
-    res.send(task);
+    res.status(201).send(task);
 })
 
 app.put('/tasks/:id', validateTaskId, validateTask, (req, res) => {
@@ -66,12 +78,21 @@ app.put('/tasks/:id', validateTaskId, validateTask, (req, res) => {
                 id: task.id,
                 title: task.title,
                 description: task.description,
-                completed: task.completed
+                completed: task.completed,
+                priority: task.priority,
+                created_on: task.created_on,
+                updated_on: new Date()
             };
         }
         return task;
     });
-    res.send(task);
+    res.status(200).send(task);
+})
+
+app.get('/tasks/priority/:level', (req, res) => {
+    const level = req.params.level;
+    const tasks = data_parsed.tasks.filter((task) => task.priority === level);
+    res.status(200).send(tasks);
 })
 
 app.delete('/tasks/:id', validateTaskId, (req, res) => {
@@ -79,15 +100,15 @@ app.delete('/tasks/:id', validateTaskId, (req, res) => {
     const task = data_parsed.tasks.find((task) => task.id === parseInt(id));
     data_parsed.tasks = data_parsed.tasks.filter((task) => task.id !== parseInt(id));
     // fs.writeFileSync('./task.json', JSON.stringify(data_parsed));
-    res.send(task);
+    res.status(200).send(task);
 })
 
-app.listen(port, (err) => {
-    if (err) {
-        return console.log('Something bad happened', err);
-    }
-    console.log(`Server is listening on ${port}`);
-});
+// app.listen(port, (err) => {
+//     if (err) {
+//         return console.log('Something bad happened', err);
+//     }
+//     console.log(`Server is listening on ${port}`);
+// });
 
 
 
